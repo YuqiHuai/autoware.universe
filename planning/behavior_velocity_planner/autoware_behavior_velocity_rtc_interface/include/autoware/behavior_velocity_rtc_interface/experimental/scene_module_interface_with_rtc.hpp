@@ -17,6 +17,7 @@
 
 #include <autoware/behavior_velocity_planner_common/experimental/scene_module_interface.hpp>
 #include <autoware/rtc_interface/rtc_interface.hpp>
+#include <autoware_internal_debug_msgs/msg/string_stamped.hpp>
 #include <autoware_utils/system/time_keeper.hpp>
 
 #include <memory>
@@ -82,6 +83,15 @@ public:
 protected:
   RTCInterface rtc_interface_;
   std::unordered_map<lanelet::Id, UUID> map_uuid_;
+
+  // Activation beacon, same topic and payload shape as behavior_path. Emitted
+  // from plan(), which the manager calls every cycle for the modules it has
+  // registered, so it reports the scene modules that actually ran rather than
+  // the plugins that were merely loaded.
+  rclcpp::Publisher<autoware_internal_debug_msgs::msg::StringStamped>::SharedPtr
+    module_activation_pub_;
+
+  void publishModuleActivation(const std::string & event, const std::string & detail);
 
   ObjectsOfInterestMarkerInterface objects_of_interest_marker_interface_;
 

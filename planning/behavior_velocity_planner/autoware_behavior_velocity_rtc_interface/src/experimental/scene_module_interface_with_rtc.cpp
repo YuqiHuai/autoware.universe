@@ -42,6 +42,20 @@ SceneModuleManagerInterfaceWithRTC::SceneModuleManagerInterfaceWithRTC(
   rtc_interface_(&node, module_name, enable_rtc),
   objects_of_interest_marker_interface_(&node, module_name)
 {
+  module_activation_pub_ = node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+    "/planning/module_activation", rclcpp::QoS{10});
+}
+
+void SceneModuleManagerInterfaceWithRTC::publishModuleActivation(
+  const std::string & event, const std::string & detail)
+{
+  if (!module_activation_pub_) {
+    return;
+  }
+  autoware_internal_debug_msgs::msg::StringStamped msg;
+  msg.stamp = clock_->now();
+  msg.data = "bvp::" + std::string{getModuleName()} + "|" + event + "|" + detail;
+  module_activation_pub_->publish(msg);
 }
 
 void SceneModuleManagerInterfaceWithRTC::plan(
@@ -51,6 +65,15 @@ void SceneModuleManagerInterfaceWithRTC::plan(
 {
   setActivation();
   modifyPathVelocity(path, header, left_bound, right_bound, planner_data);
+  // One beacon per registered scene module. The module id is the map element the
+  // module attached to, which is what makes the signal attributable; safe and
+  // activated separate "declined" from "acted".
+  for (const auto & scene_module : scene_modules_) {
+    publishModuleActivation(
+      "run", "id=" + std::to_string(scene_module->getModuleId()) +
+               ",safe=" + (scene_module->isSafe() ? "1" : "0") +
+               ",activated=" + (scene_module->isActivated() ? "1" : "0"));
+  }
   sendRTC(header.stamp);
   publishObjectsOfInterestMarker();
 }

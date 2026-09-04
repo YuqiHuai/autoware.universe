@@ -35,6 +35,7 @@
 #include <magic_enum.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+#include <autoware_internal_debug_msgs/msg/string_stamped.hpp>
 #include <autoware_internal_planning_msgs/msg/path_with_lane_id.hpp>
 #include <tier4_planning_msgs/msg/avoidance_debug_msg_array.hpp>
 #include <tier4_rtc_msgs/msg/state.hpp>
@@ -95,6 +96,10 @@ public:
     planning_factor_interface_{planning_factor_interface},
     time_keeper_(std::make_shared<autoware_utils::TimeKeeper>())
   {
+    module_activation_pub_ =
+      node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+        "/planning/module_activation", rclcpp::QoS{10});
+
     for (const auto & [module_name, ptr] : rtc_interface_ptr_map_) {
       uuid_map_.emplace(module_name, generate_uuid());
     }
@@ -137,10 +142,33 @@ public:
    * @brief Execute module. Once this function is executed,
    *        it will continue to run as long as it is in the RUNNING state.
    */
+  /**
+   * @brief Publish a module-activation beacon on /planning/module_activation.
+   *
+   * Payload is "<layer>::<module>|<event>|<detail>". The layer prefix keeps the
+   * topic usable across bpp/bvp/mvp without a separate topic per layer.
+   */
+  void publishModuleActivation(const std::string & event, const std::string & detail) const
+  {
+    if (!module_activation_pub_) {
+      return;
+    }
+    autoware_internal_debug_msgs::msg::StringStamped msg;
+    msg.stamp = clock_->now();
+    msg.data = "bpp::" + name_ + "|" + event + "|" + detail;
+    module_activation_pub_->publish(msg);
+  }
+
   virtual BehaviorModuleOutput run()
   {
     updateData();
-    const auto output = isWaitingApproval() ? planWaitingApproval() : plan();
+    const bool waiting = isWaitingApproval();
+    // Distinguishes acting from being gated on approval. planning_factors
+    // collapses both into silence, and with enable_all_modules_auto_mode false
+    // (the default) a module can compute a candidate forever without ever
+    // reaching the output path.
+    publishModuleActivation("run", waiting ? "waiting_approval" : "plan");
+    const auto output = waiting ? planWaitingApproval() : plan();
     try {
       autoware::motion_utils::validateNonEmpty(output.path.points);
     } catch (const std::exception & ex) {
@@ -162,6 +190,11 @@ public:
     const auto & from = current_state_;
     current_state_ = updateState();
     print(magic_enum::enum_name(from), magic_enum::enum_name(current_state_));
+    if (from != current_state_) {
+      publishModuleActivation(
+        "state", std::string{magic_enum::enum_name(from)} + "->" +
+                   std::string{magic_enum::enum_name(current_state_)});
+    }
   }
 
   /**
@@ -688,6 +721,12 @@ protected:
   rclcpp::Logger logger_;
 
   rclcpp::Clock::SharedPtr clock_;
+
+  // Activation beacon. behavior_path modules have no status topic at all, and 7
+  // of 11 never call planning_factor_interface_->add, so "did this module run"
+  // is otherwise unobservable from outside the process.
+  rclcpp::Publisher<autoware_internal_debug_msgs::msg::StringStamped>::SharedPtr
+    module_activation_pub_;
 
   std::shared_ptr<const PlannerData> planner_data_;
 

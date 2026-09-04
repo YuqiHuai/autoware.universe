@@ -77,6 +77,10 @@ void DynamicObstacleStopModule::init(rclcpp::Node & node, const std::string & mo
   p.ego_lateral_offset =
     std::max(std::abs(vehicle_info.min_lateral_offset_m), vehicle_info.max_lateral_offset_m);
   p.ego_longitudinal_offset = vehicle_info.max_longitudinal_offset_m;
+  module_activation_clock_ = node.get_clock();
+  module_activation_pub_ = node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+    "/planning/module_activation", rclcpp::QoS{10});
+
 }
 
 void DynamicObstacleStopModule::update_parameters(const std::vector<rclcpp::Parameter> & parameters)
@@ -106,7 +110,8 @@ VelocityPlanningResult DynamicObstacleStopModule::plan(
   debug_data_.reset_data();
   autoware_utils::StopWatch<std::chrono::microseconds> stopwatch;
   if (smoothed_trajectory_points.size() < 2) {
-    return result;
+    publish_module_activation(result);
+  return result;
   }
 
   stopwatch.tic();
@@ -192,6 +197,7 @@ VelocityPlanningResult DynamicObstacleStopModule::plan(
   processing_times["collisions"] = collisions_duration_us / 1000;
   processing_times["Total"] = total_time_us / 1000;
   processing_diag_publisher_->publish(processing_times);
+  publish_module_activation(result);
   return result;
 }
 

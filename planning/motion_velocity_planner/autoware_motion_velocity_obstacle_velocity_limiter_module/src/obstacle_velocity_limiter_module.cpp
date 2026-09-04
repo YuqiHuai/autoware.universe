@@ -65,6 +65,10 @@ void ObstacleVelocityLimiterModule::init(rclcpp::Node & node, const std::string 
 
   projection_params_.wheel_base = vehicle_info.wheel_base_m;
   projection_params_.extra_length = vehicle_front_offset_ + distance_buffer_;
+  module_activation_clock_ = node.get_clock();
+  module_activation_pub_ = node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+    "/planning/module_activation", rclcpp::QoS{10});
+
 }
 
 void ObstacleVelocityLimiterModule::update_parameters(
@@ -149,7 +153,8 @@ VelocityPlanningResult ObstacleVelocityLimiterModule::plan(
     RCLCPP_WARN_THROTTLE(
       logger_, *clock_, rcutils_duration_value_t(1000),
       "Cannot calculate ego index on the trajectory");
-    return result;
+    publish_module_activation(result);
+  return result;
   }
   auto original_traj_points = smoothed_trajectory_points;
   if (preprocessing_params_.calculate_steering_angles)
@@ -238,6 +243,7 @@ VelocityPlanningResult ObstacleVelocityLimiterModule::plan(
   processing_times["slowdowns"] = slowdowns_us / 1000;
   processing_times["Total"] = total_us / 1000;
   processing_diag_publisher_->publish(processing_times);
+  publish_module_activation(result);
   return result;
 }
 }  // namespace autoware::motion_velocity_planner

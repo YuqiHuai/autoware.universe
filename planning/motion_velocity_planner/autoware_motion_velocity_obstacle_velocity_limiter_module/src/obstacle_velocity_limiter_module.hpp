@@ -18,6 +18,7 @@
 #include "parameters.hpp"
 
 #include <autoware/motion_velocity_planner_common/plugin_module_interface.hpp>
+#include <autoware_internal_debug_msgs/msg/string_stamped.hpp>
 #include <autoware/motion_velocity_planner_common/velocity_planning_result.hpp>
 #include <autoware_utils/ros/published_time_publisher.hpp>
 #include <autoware_utils/ros/self_pose_listener.hpp>
@@ -77,6 +78,28 @@ private:
   double distance_buffer_{};
   double vehicle_lateral_offset_{};
   double vehicle_front_offset_{};
+
+  // Activation beacon; see /planning/module_activation. Emitted where the
+  // module returns its result, so it reports what the module *did*, not merely
+  // that plan() was called -- motion_velocity modules run every cycle, so
+  // "ran" carries no information on its own.
+  void publish_module_activation(const VelocityPlanningResult & r)
+  {
+    if (!module_activation_pub_ || !module_activation_clock_) {
+      return;
+    }
+    autoware_internal_debug_msgs::msg::StringStamped msg;
+    msg.stamp = module_activation_clock_->now();
+    msg.data = "mvp::" + get_short_module_name() + "|run|stops=" +
+               std::to_string(r.stop_points.size()) +
+               ",slows=" + std::to_string(r.slowdown_intervals.size()) +
+               ",limit=" + (r.velocity_limit ? "1" : "0");
+    module_activation_pub_->publish(msg);
+  }
+  rclcpp::Publisher<autoware_internal_debug_msgs::msg::StringStamped>::SharedPtr
+    module_activation_pub_;
+  rclcpp::Clock::SharedPtr module_activation_clock_;
+
 };
 }  // namespace autoware::motion_velocity_planner
 

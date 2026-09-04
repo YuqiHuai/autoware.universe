@@ -207,6 +207,10 @@ void ObstacleSlowDownModule::init(rclcpp::Node & node, const std::string & modul
 
   // time keeper
   time_keeper_ = std::make_shared<autoware_utils::TimeKeeper>(processing_time_detail_pub_);
+  module_activation_clock_ = node.get_clock();
+  module_activation_pub_ = node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+    "/planning/module_activation", rclcpp::QoS{10});
+
 }
 
 void ObstacleSlowDownModule::update_parameters(
@@ -356,6 +360,7 @@ VelocityPlanningResult ObstacleSlowDownModule::plan(
 
   publish_debug_info();
 
+  publish_module_activation(result);
   return result;
 }
 

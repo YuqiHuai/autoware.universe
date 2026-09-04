@@ -122,6 +122,10 @@ void ObstacleCruiseModule::init(rclcpp::Node & node, const std::string & module_
 
   // cruise planner
   cruise_planner_ = create_cruise_planner(node);
+  module_activation_clock_ = node.get_clock();
+  module_activation_pub_ = node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+    "/planning/module_activation", rclcpp::QoS{10});
+
 }
 
 void ObstacleCruiseModule::update_parameters(const std::vector<rclcpp::Parameter> & parameters)
@@ -167,6 +171,7 @@ VelocityPlanningResult ObstacleCruiseModule::plan(
 
   publish_debug_info();
 
+  publish_module_activation(result);
   return result;
 }
 

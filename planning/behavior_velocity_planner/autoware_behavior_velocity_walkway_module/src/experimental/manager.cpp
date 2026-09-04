@@ -35,6 +35,29 @@ WalkwayModuleManager::WalkwayModuleManager(rclcpp::Node & node)
   wp.stop_distance_from_crosswalk =
     get_or_declare_parameter<double>(node, ns + ".stop_distance_from_crosswalk");
   wp.stop_duration = get_or_declare_parameter<double>(node, ns + ".stop_duration");
+
+  module_activation_pub_ =
+    node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+      "/planning/module_activation", rclcpp::QoS{10});
+}
+
+void WalkwayModuleManager::plan(
+  Trajectory & path, const std_msgs::msg::Header & header,
+  const std::vector<geometry_msgs::msg::Point> & left_bound,
+  const std::vector<geometry_msgs::msg::Point> & right_bound, const PlannerData & planner_data)
+{
+  SceneModuleManagerInterface<>::plan(path, header, left_bound, right_bound, planner_data);
+  if (!module_activation_pub_) {
+    return;
+  }
+  // One beacon per registered scene module; the id is the map element it
+  // attached to, which is what makes the signal attributable.
+  for (const auto & scene_module : scene_modules_) {
+    autoware_internal_debug_msgs::msg::StringStamped msg;
+    msg.stamp = header.stamp;
+    msg.data = "bvp::walkway|run|id=" + std::to_string(scene_module->getModuleId());
+    module_activation_pub_->publish(msg);
+  }
 }
 
 void WalkwayModuleManager::launchNewModules(

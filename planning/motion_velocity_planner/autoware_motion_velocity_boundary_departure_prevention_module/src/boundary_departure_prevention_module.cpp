@@ -77,6 +77,10 @@ void BoundaryDeparturePreventionModule::init(
 
   last_abnormality_fp_no_overlap_bound_time_ = clock_ptr_->now().seconds();
   last_abnormality_fp_overlap_bound_time_ = clock_ptr_->now().seconds();
+  module_activation_clock_ = node.get_clock();
+  module_activation_pub_ = node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+    "/planning/module_activation", rclcpp::QoS{10});
+
 }
 
 void BoundaryDeparturePreventionModule::update_parameters(
@@ -370,10 +374,10 @@ VelocityPlanningResult BoundaryDeparturePreventionModule::plan(
 
   if (!result_opt) {
     RCLCPP_DEBUG(logger_, "%s", result_opt.error().c_str());
-    return {};
+    return publish_module_activation({});
   }
 
-  return *result_opt;
+  return publish_module_activation(*result_opt);
 }
 
 tl::expected<VelocityPlanningResult, std::string>

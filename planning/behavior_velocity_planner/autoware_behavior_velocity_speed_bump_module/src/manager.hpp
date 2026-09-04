@@ -17,6 +17,7 @@
 
 #include "scene.hpp"
 
+#include <autoware_internal_debug_msgs/msg/string_stamped.hpp>
 #include <autoware/behavior_velocity_planner_common/experimental/plugin_wrapper.hpp>
 
 #include <functional>
@@ -27,6 +28,19 @@ namespace autoware::behavior_velocity_planner
 class SpeedBumpModuleManager : public experimental::SceneModuleManagerInterface<>
 {
 public:
+  // Activation beacon; see /planning/module_activation. These modules inherit
+  // their base from autoware_core, so unlike the RTC managers they cannot be
+  // covered by a single patch in universe -- the hook goes here, in the
+  // per-module manager, which is the nearest universe-side per-cycle entry.
+  void plan(
+    experimental::Trajectory & path, const std_msgs::msg::Header & header,
+    const std::vector<geometry_msgs::msg::Point> & left_bound,
+    const std::vector<geometry_msgs::msg::Point> & right_bound,
+    const PlannerData & planner_data) override;
+
+  rclcpp::Publisher<autoware_internal_debug_msgs::msg::StringStamped>::SharedPtr
+    module_activation_pub_;
+
   explicit SpeedBumpModuleManager(rclcpp::Node & node);
 
   const char * getModuleName() override { return "speed_bump"; }
@@ -46,6 +60,7 @@ private:
   std::function<bool(const std::shared_ptr<experimental::SceneModuleInterface> &)>
   getModuleExpiredFunction(
     const experimental::Trajectory & path, const PlannerData & planner_data) override;
+
 };
 
 class SpeedBumpModulePlugin : public experimental::PluginWrapper<SpeedBumpModuleManager>

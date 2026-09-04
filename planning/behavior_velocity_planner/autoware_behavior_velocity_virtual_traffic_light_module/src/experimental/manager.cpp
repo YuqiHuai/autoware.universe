@@ -56,6 +56,29 @@ VirtualTrafficLightModuleManager::VirtualTrafficLightModuleManager(rclcpp::Node 
   pub_infrastructure_commands_ =
     node.create_publisher<tier4_v2x_msgs::msg::InfrastructureCommandArray>(
       "~/output/infrastructure_commands", 1);
+
+  module_activation_pub_ =
+    node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+      "/planning/module_activation", rclcpp::QoS{10});
+}
+
+void VirtualTrafficLightModuleManager::plan(
+  Trajectory & path, const std_msgs::msg::Header & header,
+  const std::vector<geometry_msgs::msg::Point> & left_bound,
+  const std::vector<geometry_msgs::msg::Point> & right_bound, const PlannerData & planner_data)
+{
+  SceneModuleManagerInterface<VirtualTrafficLightModule>::plan(path, header, left_bound, right_bound, planner_data);
+  if (!module_activation_pub_) {
+    return;
+  }
+  // One beacon per registered scene module; the id is the map element it
+  // attached to, which is what makes the signal attributable.
+  for (const auto & scene_module : scene_modules_) {
+    autoware_internal_debug_msgs::msg::StringStamped msg;
+    msg.stamp = header.stamp;
+    msg.data = "bvp::virtual_traffic_light|run|id=" + std::to_string(scene_module->getModuleId());
+    module_activation_pub_->publish(msg);
+  }
 }
 
 void VirtualTrafficLightModuleManager::launchNewModules(

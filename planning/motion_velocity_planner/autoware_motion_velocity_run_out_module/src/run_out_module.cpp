@@ -85,6 +85,10 @@ void RunOutModule::init(rclcpp::Node & node, const std::string & module_name)
   planning_factor_interface_ =
     std::make_unique<autoware::planning_factor_interface::PlanningFactorInterface>(
       &node, "run_out");
+  module_activation_clock_ = node.get_clock();
+  module_activation_pub_ = node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+    "/planning/module_activation", rclcpp::QoS{10});
+
 }
 
 double calculate_keep_stop_distance_range(
@@ -236,7 +240,7 @@ VelocityPlanningResult RunOutModule::plan(
 
   time_keeper_->end_track("plan()");
 
-  return result.velocity_planning_result;
+  return publish_module_activation(result.velocity_planning_result);
 }
 
 }  // namespace autoware::motion_velocity_planner

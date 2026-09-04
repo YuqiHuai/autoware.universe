@@ -46,6 +46,30 @@ SpeedBumpModuleManager::SpeedBumpModuleManager(rclcpp::Node & node)
     static_cast<float>(experimental::get_or_declare_parameter<double>(node, ns + ".min_speed"));
   planner_param_.speed_calculation_max_speed =
     static_cast<float>(experimental::get_or_declare_parameter<double>(node, ns + ".max_speed"));
+
+  module_activation_pub_ =
+    node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+      "/planning/module_activation", rclcpp::QoS{10});
+}
+
+void SpeedBumpModuleManager::plan(
+  experimental::Trajectory & path, const std_msgs::msg::Header & header,
+  const std::vector<geometry_msgs::msg::Point> & left_bound,
+  const std::vector<geometry_msgs::msg::Point> & right_bound,
+  const PlannerData & planner_data)
+{
+  experimental::SceneModuleManagerInterface<>::plan(path, header, left_bound, right_bound, planner_data);
+  if (!module_activation_pub_) {
+    return;
+  }
+  // One beacon per registered scene module; the id is the map element it
+  // attached to, which is what makes the signal attributable.
+  for (const auto & scene_module : scene_modules_) {
+    autoware_internal_debug_msgs::msg::StringStamped msg;
+    msg.stamp = header.stamp;
+    msg.data = "bvp::speed_bump|run|id=" + std::to_string(scene_module->getModuleId());
+    module_activation_pub_->publish(msg);
+  }
 }
 
 void SpeedBumpModuleManager::launchNewModules(

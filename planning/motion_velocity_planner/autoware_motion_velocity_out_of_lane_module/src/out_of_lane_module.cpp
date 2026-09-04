@@ -81,6 +81,10 @@ void OutOfLaneModule::init(rclcpp::Node & node, const std::string & module_name)
     "~/debug/" + ns_ + "/trajectory", 1);
   processing_diag_publisher_ = std::make_shared<autoware_utils::ProcessingTimePublisher>(
     &node, "~/debug/" + ns_ + "/processing_time_ms_diag");
+  module_activation_clock_ = node.get_clock();
+  module_activation_pub_ = node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+    "/planning/module_activation", rclcpp::QoS{10});
+
 }
 void OutOfLaneModule::init_parameters(rclcpp::Node & node)
 {
@@ -479,7 +483,8 @@ VelocityPlanningResult OutOfLaneModule::plan(
     debug_publisher_->publish(
       out_of_lane::debug::create_debug_marker_array(
         ego_data, out_of_lane_data, objects, debug_data_));
-    return result;
+    publish_module_activation(result);
+  return result;
   }
 
   stopwatch.tic("calculate_slowdown_point");
@@ -508,6 +513,7 @@ VelocityPlanningResult OutOfLaneModule::plan(
   processing_times["publish_markers"] = pub_markers_us / 1000;
   processing_times["Total"] = total_time_us / 1000;
   processing_diag_publisher_->publish(processing_times);
+  publish_module_activation(result);
   return result;
 }
 

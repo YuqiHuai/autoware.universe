@@ -16,6 +16,7 @@
 #define BOUNDARY_DEPARTURE_PREVENTION_MODULE_HPP_
 
 #include "parameters.hpp"
+#include <autoware_internal_debug_msgs/msg/string_stamped.hpp>
 #include "slow_down_interpolator.hpp"
 
 #include <autoware/motion_velocity_planner_common/plugin_module_interface.hpp>
@@ -141,6 +142,28 @@ private:
   std::unique_ptr<diagnostic_updater::Updater> updater_ptr_;
 
   mutable std::shared_ptr<autoware_utils::TimeKeeper> time_keeper_;
+
+  // Activation beacon; see /planning/module_activation. Emitted where the
+  // module returns its result, so it reports what the module *did*, not merely
+  // that plan() was called -- motion_velocity modules run every cycle, so
+  // "ran" carries no information on its own.
+  VelocityPlanningResult publish_module_activation(const VelocityPlanningResult & r)
+  {
+    if (module_activation_pub_ && module_activation_clock_) {
+      autoware_internal_debug_msgs::msg::StringStamped msg;
+      msg.stamp = module_activation_clock_->now();
+      msg.data = "mvp::" + get_short_module_name() + "|run|stops=" +
+                 std::to_string(r.stop_points.size()) +
+                 ",slows=" + std::to_string(r.slowdown_intervals.size()) +
+                 ",limit=" + (r.velocity_limit ? "1" : "0");
+      module_activation_pub_->publish(msg);
+    }
+    return r;
+  }
+  rclcpp::Publisher<autoware_internal_debug_msgs::msg::StringStamped>::SharedPtr
+    module_activation_pub_;
+  rclcpp::Clock::SharedPtr module_activation_clock_;
+
 };
 }  // namespace autoware::motion_velocity_planner::experimental
 #endif  // BOUNDARY_DEPARTURE_PREVENTION_MODULE_HPP_

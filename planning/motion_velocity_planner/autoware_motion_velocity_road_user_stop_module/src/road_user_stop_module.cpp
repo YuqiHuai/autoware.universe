@@ -116,6 +116,10 @@ void RoadUserStopModule::init(rclcpp::Node & node, const std::string & module_na
     "~/debug/processing_time_detail_ms/road_user_stop", 1);
 
   time_keeper_ = std::make_shared<autoware_utils_debug::TimeKeeper>(processing_time_detail_pub_);
+  module_activation_clock_ = node.get_clock();
+  module_activation_pub_ = node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+    "/planning/module_activation", rclcpp::QoS{10});
+
 }
 
 void RoadUserStopModule::update_tracked_objects(
@@ -521,6 +525,7 @@ VelocityPlanningResult RoadUserStopModule::plan(
   // 5. Publish debug information
   publish_debug_info();
 
+  publish_module_activation(result);
   return result;
 }
 
